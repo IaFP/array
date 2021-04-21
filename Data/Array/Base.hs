@@ -11,6 +11,10 @@
   , RoleAnnotations
  #-}
 {-# OPTIONS_HADDOCK hide #-}
+#if __GLASGOW_HASKELL__ >= 810
+{-# LANGUAGE PartialTypeConstructors #-}
+{-# LANGUAGE TypeOperators, TypeFamilies #-}
+#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -41,6 +45,7 @@ import qualified GHC.Arr as Arr
 import qualified GHC.Arr as ArrST
 import GHC.ST           ( ST(..), runST )
 import GHC.Base         ( IO(..), divInt# )
+import Data.List.NonEmpty (NonEmpty (..))
 import GHC.Exts
 import GHC.Ptr          ( nullPtr, nullFunPtr )
 import GHC.Show         ( appPrec )
@@ -53,6 +58,9 @@ import GHC.IOArray      ( IOArray(..),
                           newIOArray, unsafeReadIOArray, unsafeWriteIOArray )
 import Text.Read.Lex    ( Lexeme(Ident) )
 import Text.ParserCombinators.ReadPrec ( prec, ReadPrec, step )
+#if __GLASGOW_HASKELL__ >= 810
+import GHC.Types (type (@@), Total)
+#endif
 
 #include "MachDeps.h"
 
@@ -831,17 +839,17 @@ class (Monad m) => MArray a e m where
 
     -- | Builds a new array, with every element initialised to the supplied
     -- value.
-    newArray    :: Ix i => (i,i) -> e -> m (a i e)
+    newArray    :: (Ix i, m @@ ())  => (i,i) -> e -> m (a i e)
 
     -- | Builds a new array, with every element initialised to an
     -- undefined value. In a monadic context in which operations must
     -- be deterministic (e.g. the ST monad), the array elements are
     -- initialised to a fixed but undefined value, such as zero.
-    newArray_ :: Ix i => (i,i) -> m (a i e)
+    newArray_ :: (Ix i, m @@ ()) => (i,i) -> m (a i e)
 
     -- | Builds a new array, with every element initialised to an undefined
     -- value.
-    unsafeNewArray_ :: Ix i => (i,i) -> m (a i e)
+    unsafeNewArray_ :: (Ix i, m @@ ()) => (i,i) -> m (a i e)
 
     unsafeRead  :: Ix i => a i e -> Int -> m e
     unsafeWrite :: Ix i => a i e -> Int -> e -> m ()
@@ -890,7 +898,7 @@ instance MArray IOArray e IO where
 -- | Constructs a mutable array from a list of initial elements.
 -- The list gives the elements of the array in ascending order
 -- beginning with the lowest index.
-newListArray :: (MArray a e m, Ix i) => (i,i) -> [e] -> m (a i e)
+newListArray :: (MArray a e m, Ix i,  m @@ ()) => (i,i) -> [e] -> m (a i e)
 newListArray (l,u) es = do
     marr <- newArray_ (l,u)
     let n = safeRangeSize (l,u)
@@ -903,7 +911,7 @@ newListArray (l,u) es = do
 
 {-# INLINE readArray #-}
 -- | Read an element from a mutable array
-readArray :: (MArray a e m, Ix i) => a i e -> i -> m e
+readArray :: (MArray a e m, Ix i, m @@ Int,  m @@ (i, i)) => a i e -> i -> m e
 readArray marr i = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -911,7 +919,7 @@ readArray marr i = do
 
 {-# INLINE writeArray #-}
 -- | Write an element in a mutable array
-writeArray :: (MArray a e m, Ix i) => a i e -> i -> e -> m ()
+writeArray :: (MArray a e m, Ix i, m @@ Int, m @@ (i, i)) => a i e -> i -> e -> m ()
 writeArray marr i e = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -919,7 +927,8 @@ writeArray marr i e = do
 
 {-# INLINE getElems #-}
 -- | Return a list of all the elements of a mutable array
-getElems :: (MArray a e m, Ix i) => a i e -> m [e]
+getElems :: (MArray a e m, Ix i, Total m)
+         => a i e -> m [e]
 getElems marr = do
   (_l, _u) <- getBounds marr
   n <- getNumElements marr
@@ -928,7 +937,8 @@ getElems marr = do
 {-# INLINE getAssocs #-}
 -- | Return a list of all the associations of a mutable array, in
 -- index order.
-getAssocs :: (MArray a e m, Ix i) => a i e -> m [(i, e)]
+getAssocs :: (MArray a e m, Ix i, Total m)
+          => a i e -> m [(i, e)]
 getAssocs marr = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -938,7 +948,8 @@ getAssocs marr = do
 {-# INLINE mapArray #-}
 -- | Constructs a new array derived from the original array by applying a
 -- function to each of the elements.
-mapArray :: (MArray a e' m, MArray a e m, Ix i) => (e' -> e) -> a i e' -> m (a i e)
+mapArray :: (MArray a e' m, MArray a e m, Ix i, Total m)
+         => (e' -> e) -> a i e' -> m (a i e)
 mapArray f marr = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -951,7 +962,7 @@ mapArray f marr = do
 {-# INLINE mapIndices #-}
 -- | Constructs a new array derived from the original array by applying a
 -- function to each of the indices.
-mapIndices :: (MArray a e m, Ix i, Ix j) => (i,i) -> (i -> j) -> a j e -> m (a i e)
+mapIndices :: (MArray a e m, Ix i, Ix j, m @@ e, m @@ (), m @@ Int, m @@ (j, j)) => (i,i) -> (i -> j) -> a j e -> m (a i e)
 mapIndices (l',u') f marr = do
     marr' <- newArray_ (l',u')
     n' <- getNumElements marr'
@@ -1386,7 +1397,8 @@ bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb#
 -- | Converts a mutable array (any instance of 'MArray') to an
 -- immutable array (any instance of 'IArray') by taking a complete
 -- copy of it.
-freeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
+freeze :: (Ix i, MArray a e m, IArray b e, Total m)
+       => a i e -> m (b i e)
 {-# NOINLINE [1] freeze #-}
 freeze marr = do
   (l,u) <- getBounds marr
@@ -1447,7 +1459,8 @@ foreign import ccall unsafe "memcpy"
      * 'Data.Array.ST.STArray' -> 'Data.Array.Array'
 -}
 {-# INLINE [1] unsafeFreeze #-}
-unsafeFreeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
+unsafeFreeze :: (Ix i, MArray a e m, IArray b e, Total m)
+             => a i e -> m (b i e)
 unsafeFreeze = freeze
 
 {-# RULES
@@ -1461,7 +1474,7 @@ unsafeFreeze = freeze
 -- | Converts an immutable array (any instance of 'IArray') into a
 -- mutable array (any instance of 'MArray') by taking a complete copy
 -- of it.
-thaw :: (Ix i, IArray a e, MArray b e m) => a i e -> m (b i e)
+thaw :: (Ix i, IArray a e, MArray b e m, m @@ ()) => a i e -> m (b i e)
 {-# NOINLINE [1] thaw #-}
 thaw arr = case bounds arr of
   (l,u) -> do
@@ -1527,7 +1540,7 @@ foreign import ccall unsafe "memcpy"
      * 'Data.Array.Array'  -> 'Data.Array.ST.STArray'
 -}
 {-# INLINE [1] unsafeThaw #-}
-unsafeThaw :: (Ix i, IArray a e, MArray b e m) => a i e -> m (b i e)
+unsafeThaw :: (Ix i, IArray a e, MArray b e m, m @@ ()) => a i e -> m (b i e)
 unsafeThaw = thaw
 
 {-# INLINE unsafeThawSTUArray #-}

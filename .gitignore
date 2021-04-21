@@ -8,3 +8,4 @@ dist/
 dist-newstyle/
 .ghc.environment.*
 ghc.mk
+*.hs.bak

@@ -1,4 +1,8 @@
 {-# LANGUAGE MagicHash, UnliftedFFITypes #-}
+{-# LANGUAGE CPP #-}
+#if __GLASGOW_HASKELL__ >= 810
+{-# LANGUAGE PartialTypeConstructors #-}
+#endif
 
 -----------------------------------------------------------------------------
 -- |

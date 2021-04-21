@@ -3,6 +3,10 @@
   , MultiParamTypeClasses
   , RoleAnnotations
  #-}
+{-# LANGUAGE CPP #-}
+#if __GLASGOW_HASKELL__ >= 810
+{-# LANGUAGE PartialTypeConstructors #-}
+#endif
 
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
