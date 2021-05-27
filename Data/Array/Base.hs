@@ -45,7 +45,6 @@ import qualified GHC.Arr as Arr
 import qualified GHC.Arr as ArrST
 import GHC.ST           ( ST(..), runST )
 import GHC.Base         ( IO(..), divInt# )
-import Data.List.NonEmpty (NonEmpty (..))
 import GHC.Exts
 import GHC.Ptr          ( nullPtr, nullFunPtr )
 import GHC.Show         ( appPrec )
