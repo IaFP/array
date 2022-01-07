@@ -9,6 +9,9 @@
   , FlexibleContexts
   , UnliftedFFITypes
   , RoleAnnotations
+  , ExplicitNamespaces
+  , UndecidableSuperClasses
+  , QuantifiedConstraints
  #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -53,6 +56,7 @@ import GHC.IOArray      ( IOArray(..),
                           newIOArray, unsafeReadIOArray, unsafeWriteIOArray )
 import Text.Read.Lex    ( Lexeme(Ident) )
 import Text.ParserCombinators.ReadPrec ( prec, ReadPrec, step )
+import GHC.Types (type (@), Total)
 
 #include "MachDeps.h"
 
@@ -822,7 +826,7 @@ instances specialised to certain element types can be defined, in the
 same way as for 'IArray'), and also over the type of the monad, @m@,
 in which the mutable array will be manipulated.
 -}
-class (Monad m) => MArray a e m where
+class (Monad m, m @ ()) => MArray a e m where
 
     -- | Returns the bounds of the array
     getBounds      :: Ix i => a i e -> m (i,i)
@@ -903,7 +907,7 @@ newListArray (l,u) es = do
 
 {-# INLINE readArray #-}
 -- | Read an element from a mutable array
-readArray :: (MArray a e m, Ix i) => a i e -> i -> m e
+readArray :: (m @ (i, i), m @ Int, MArray a e m, Ix i) => a i e -> i -> m e
 readArray marr i = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -911,7 +915,7 @@ readArray marr i = do
 
 {-# INLINE writeArray #-}
 -- | Write an element in a mutable array
-writeArray :: (MArray a e m, Ix i) => a i e -> i -> e -> m ()
+writeArray :: (m @ (i, i), m @ Int, MArray a e m, Ix i) => a i e -> i -> e -> m ()
 writeArray marr i e = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -919,7 +923,7 @@ writeArray marr i e = do
 
 {-# INLINE getElems #-}
 -- | Return a list of all the elements of a mutable array
-getElems :: (MArray a e m, Ix i) => a i e -> m [e]
+getElems :: (Total m, MArray a e m, Ix i) => a i e -> m [e]
 getElems marr = do
   (_l, _u) <- getBounds marr
   n <- getNumElements marr
@@ -928,7 +932,7 @@ getElems marr = do
 {-# INLINE getAssocs #-}
 -- | Return a list of all the associations of a mutable array, in
 -- index order.
-getAssocs :: (MArray a e m, Ix i) => a i e -> m [(i, e)]
+getAssocs :: (Total m, MArray a e m, Ix i) => a i e -> m [(i, e)]
 getAssocs marr = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -938,7 +942,7 @@ getAssocs marr = do
 {-# INLINE mapArray #-}
 -- | Constructs a new array derived from the original array by applying a
 -- function to each of the elements.
-mapArray :: (MArray a e' m, MArray a e m, Ix i) => (e' -> e) -> a i e' -> m (a i e)
+mapArray :: (Total m, MArray a e' m, MArray a e m, Ix i) => (e' -> e) -> a i e' -> m (a i e)
 mapArray f marr = do
   (l,u) <- getBounds marr
   n <- getNumElements marr
@@ -951,7 +955,7 @@ mapArray f marr = do
 {-# INLINE mapIndices #-}
 -- | Constructs a new array derived from the original array by applying a
 -- function to each of the indices.
-mapIndices :: (MArray a e m, Ix i, Ix j) => (i,i) -> (i -> j) -> a j e -> m (a i e)
+mapIndices :: (m @ e, m @ (), m @ Int, m @ (j, j), MArray a e m, Ix i, Ix j) => (i,i) -> (i -> j) -> a j e -> m (a i e)
 mapIndices (l',u') f marr = do
     marr' <- newArray_ (l',u')
     n' <- getNumElements marr'
@@ -1386,7 +1390,7 @@ bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb#
 -- | Converts a mutable array (any instance of 'MArray') to an
 -- immutable array (any instance of 'IArray') by taking a complete
 -- copy of it.
-freeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
+freeze :: (Total m, Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
 {-# NOINLINE [1] freeze #-}
 freeze marr = do
   (l,u) <- getBounds marr
@@ -1447,7 +1451,7 @@ foreign import ccall unsafe "memcpy"
      * 'Data.Array.ST.STArray' -> 'Data.Array.Array'
 -}
 {-# INLINE [1] unsafeFreeze #-}
-unsafeFreeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
+unsafeFreeze :: (Total m, Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
 unsafeFreeze = freeze
 
 {-# RULES

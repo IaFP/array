@@ -37,6 +37,7 @@ library
       UnboxedTuples,
       UnliftedFFITypes
   build-depends: base >= 4.9 && < 4.17
+                 , ghc-prim >= 0.8.0 && <= 0.9.0
   ghc-options: -Wall
   exposed-modules:
       Data.Array
