@@ -35,7 +35,7 @@ import Foreign.Ptr              ( Ptr, FunPtr )
 import Foreign.StablePtr        ( StablePtr )
 
 import Data.Array.Base
-
+import GHC.Ix (Ix (..))
 import GHC.IOArray (IOArray(..))
 
 -----------------------------------------------------------------------------
@@ -49,7 +49,7 @@ import GHC.IOArray (IOArray(..))
 --  * @e@: the element type of the array.  Only certain element types
 --    are supported: see "Data.Array.MArray" for a list of instances.
 --
-newtype IOUArray i e = IOUArray (STUArray RealWorld i e)
+newtype Ix i => IOUArray i e = IOUArray (STUArray RealWorld i e)
 -- Both parameters have class-based invariants. See also #9220.
 type role IOUArray nominal nominal
 

@@ -56,7 +56,7 @@ import GHC.IOArray      ( IOArray(..),
                           newIOArray, unsafeReadIOArray, unsafeWriteIOArray )
 import Text.Read.Lex    ( Lexeme(Ident) )
 import Text.ParserCombinators.ReadPrec ( prec, ReadPrec, step )
-import GHC.Types (type (@), Total)
+import GHC.Types (type (@), Total, Unboxable)
 
 #include "MachDeps.h"
 
@@ -414,7 +414,11 @@ instance IArray Arr.Array e where
 -- get the benefits of unboxed arrays (don\'t forget to import
 -- "Data.Array.Unboxed" instead of "Data.Array").
 --
-data UArray i e = UArray !i !i !Int ByteArray#
+data
+#if MIN_VERSION_base(4,16,0)
+  (Ix i, Unboxable e) =>
+#endif
+  UArray i e = UArray !i !i !Int ByteArray#
 -- There are class-based invariants on both parameters. See also #9220.
 type role UArray nominal nominal
 
@@ -1009,7 +1013,7 @@ instance MArray (STArray s) e (Lazy.ST s) where
 -- element type.  However, 'STUArray' is strict in its elements - so
 -- don\'t use 'STUArray' if you require the non-strictness that
 -- 'STArray' provides.
-data STUArray s i e = STUArray !i !i !Int (MutableByteArray# s)
+data Ix i => STUArray s i e = STUArray !i !i !Int (MutableByteArray# s)
 -- The "ST" parameter must be nominal for the safety of the ST trick.
 -- The other parameters have class constraints. See also #9220.
 type role STUArray nominal nominal nominal
